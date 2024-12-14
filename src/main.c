@@ -16,11 +16,30 @@ struct movement Player = {
     .speed = 0.0f,
 };
 
-bool isMoving = false;
+struct movement_car {
+    bool isRotating;
+    bool isMoving;
+    bool isAccelerating;
+    bool isReversing;
+    bool isBreaking;
+
+    // Gear Shift
+    int playerGear;
+    bool isGearShifting;
+    bool isGearReady;
+    bool gearDirectionUp;
+    int gearCooldown;
+    int gearFullCooldown;
+};
+
 bool isRotating = false;
+bool isMoving = false;
+bool isAccelerating = false;
+bool isReversing = false;
+bool isBreaking = false;
 
 // Gear Shift
-int gear = 0;
+int playerGear = 0;
 bool isGearShifting = false;
 bool isGearReady = true;
 bool gearDirectionUp = false;
@@ -53,19 +72,22 @@ void input(bool *pause) {
 
 
     if (IsKeyDown(KEY_S)) {
-        direction_y = 1;
+        isBreaking = true;
+        isAccelerating = false;
     }
     else if (IsKeyDown(KEY_W)) {
-        direction_y = -1;
+        isAccelerating = true;
     }
-    else direction_y = 0;
+    else {
+        isAccelerating = false;
+    }
 
     if (direction_x != 0)
         isRotating = true;
     else
         isRotating = false;
 
-    if (direction_y != 0)
+    if (isAccelerating)
         isMoving = true;
     else
         isMoving = false;
@@ -99,13 +121,13 @@ int main(void) {
         // UPDATE
         if (!pause) {
             playerFriction = 1.0f;
-            if (isRotating AND ((isMoving AND gear != 0) OR Player.speed > 0)) {
+            if (isRotating AND ((isMoving AND playerGear != 0) OR Player.speed > 0)) {
                 // only allow turning while moving
                 playerRotation += direction_x * playerRotationSpeed * 0.5;
                 if (playerRotation >= 360) {
                     playerRotation = 0;
                 };
-                playerFriction = 1.0 / gear;
+                playerFriction = 1.0 / playerGear;
             }
             /*else if (isRotating) {*/
             /*    playerRotation += direction_x * playerRotationSpeed;*/
@@ -114,11 +136,21 @@ int main(void) {
             /*    };*/
             /*}*/
 
-            if (isMoving AND gear != 0) {
+            if (isMoving AND isAccelerating AND playerGear != 0) {
                 Player.speed += 1.0 * dt;
-                if (Player.speed >= playerMaxSpeed * gear) {
+                if (Player.speed >= playerMaxSpeed * playerGear) {
                     // NOTE: downshifting sets speed lower instantly.
-                    Player.speed = playerMaxSpeed * gear;
+                    Player.speed = playerMaxSpeed * playerGear;
+                }
+            } else if (isMoving AND playerGear == -1) { // reversing
+                Player.speed -= 1.0 * dt;
+                if (Player.speed <= playerMaxSpeed * playerGear) {
+                    Player.speed = playerMaxSpeed * playerGear;
+                }
+            } else if (Player.speed > 0 AND isBreaking) {
+                Player.speed -= 4.0 * dt;
+                if (Player.speed < 0) {
+                    Player.speed = 0;
                 }
             } else {
                 Player.speed -= (1 + playerFriction) * dt;
@@ -128,7 +160,6 @@ int main(void) {
                 }
             }
             //float magnitude = sqrt(direction_x * direction_x + direction_y * direction_y);
-
 
 
             // Movement
@@ -147,13 +178,13 @@ int main(void) {
 
             // Gear Control
             if (isGearShifting) {
-                if (gearDirectionUp AND isGearReady AND gear < 5) {
-                    gear++;
+                if (gearDirectionUp AND isGearReady AND playerGear < 5) {
+                    playerGear++;
                     isGearReady = !isGearReady;
                     gearCooldown = gearFullCooldown;
                 }
-                else if (!gearDirectionUp AND isGearReady AND gear > -1) {
-                    gear--;
+                else if (!gearDirectionUp AND isGearReady AND playerGear > -1) {
+                    playerGear--;
                     isGearReady = !isGearReady;
                     gearCooldown = gearFullCooldown;
                 }
@@ -191,7 +222,7 @@ int main(void) {
 
             char gearDisplay[50];
             char speedDisplay[50];
-            snprintf(gearDisplay, sizeof(gearDisplay), "Gear: %d", gear);
+            snprintf(gearDisplay, sizeof(gearDisplay), "Gear: %d", playerGear);
             snprintf(speedDisplay, sizeof(speedDisplay), "Speed: %f", Player.speed);
 
             DrawText(gearDisplay, GetScreenWidth() - 200, GetScreenHeight() - 100, 20, LIGHTGRAY);
