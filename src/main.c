@@ -1,19 +1,32 @@
+#include <stdio.h>
 #include "include/raylib.h"
 #include "include/raymath.h"
 #include "include/constants.h"
+#include "include/base.h"
 
-typedef struct entity Entity;
+//typedef struct entity Entity;
 
-struct bullet {
-    float radius;
+struct movement {
+    Vector2 position;
+    float speed;
 };
 
-void move_entity(int direction) {
+struct movement Player = {
+    .position = { SCREEN_WIDTH / 2.0f, SCREEN_HEIGHT / 2.0f },
+    .speed = 0.0f,
+};
 
-}
+bool isMoving = false;
+bool isRotating = false;
 
+// Gear Shift
+int gear = 0;
+bool isGearShifting = false;
+bool isGearReady = true;
+bool gearDirectionUp = false;
+int gearCooldown = 0;
+int gearFullCooldown = 30;
 
-bool isMoving;
 int direction_x = 0, direction_y = 0;
 
 void input(bool *pause) {
@@ -21,6 +34,14 @@ void input(bool *pause) {
     if (IsKeyPressed(KEY_SPACE))
         *pause = !(*pause);
 
+    if (IsKeyDown(KEY_Q)) {
+        isGearShifting = true;
+        gearDirectionUp = false;
+    }
+    else if (IsKeyDown(KEY_E)) {
+        isGearShifting = true;
+        gearDirectionUp = true;
+    }
 
     if (IsKeyDown(KEY_D)) {
         direction_x = 1;
@@ -30,6 +51,7 @@ void input(bool *pause) {
     }
     else direction_x = 0;
 
+
     if (IsKeyDown(KEY_S)) {
         direction_y = 1;
     }
@@ -38,7 +60,12 @@ void input(bool *pause) {
     }
     else direction_y = 0;
 
-    if (direction_x != 0 || direction_y != 0)
+    if (direction_x != 0)
+        isRotating = true;
+    else
+        isRotating = false;
+
+    if (direction_y != 0)
         isMoving = true;
     else
         isMoving = false;
@@ -53,39 +80,92 @@ int main(void) {
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "r55");
 
     // SETUP
-    Vector2 ballPosition = { SCREEN_WIDTH/2.0f, SCREEN_HEIGHT/2.0f };
-    float ballSpeed = 4.0f;
-    int ballRadius = 20;
-
     int framesCounter = 0;
-
-    int radiusInc = 1;
-
     bool pause = 0;
+
+    float playerRotation = 0.0f;
+    float playerRotationSpeed = 5.0f;
+    float playerFriction = 1.0f;
+    float playerMaxSpeed = 2.0f;
+    Vector2 playerSize = { 40.0f, 80.0f };
 
     SetTargetFPS(TARGET_FPS);
     while (!WindowShouldClose()) {
+        float dt = GetFrameTime();
 
         // INPUT
         input(&pause);
 
         // UPDATE
         if (!pause) {
-            if (ballRadius < 20) {
-                radiusInc = 1;
-            } else radiusInc = -1;
+            playerFriction = 1.0f;
+            if (isRotating AND ((isMoving AND gear != 0) OR Player.speed > 0)) {
+                // only allow turning while moving
+                playerRotation += direction_x * playerRotationSpeed * 0.5;
+                if (playerRotation >= 360) {
+                    playerRotation = 0;
+                };
+                playerFriction = 1.0 / gear;
+            }
+            /*else if (isRotating) {*/
+            /*    playerRotation += direction_x * playerRotationSpeed;*/
+            /*    if (playerRotation >= 360) {*/
+            /*        playerRotation = 0;*/
+            /*    };*/
+            /*}*/
 
-            if ((framesCounter % 30) == 0)
-                ballRadius += 2 * radiusInc;
+            if (isMoving AND gear != 0) {
+                Player.speed += 1.0 * dt;
+                if (Player.speed >= playerMaxSpeed * gear) {
+                    // NOTE: downshifting sets speed lower instantly.
+                    Player.speed = playerMaxSpeed * gear;
+                }
+            } else {
+                Player.speed -= (1 + playerFriction) * dt;
+                //printf("%f\n", Player.speed);
+                if (Player.speed < 0) {
+                    Player.speed = 0;
+                }
+            }
+            //float magnitude = sqrt(direction_x * direction_x + direction_y * direction_y);
 
-            if (isMoving) {
-                float magnitude = sqrt(direction_x * direction_x + direction_y * direction_y);
 
-                float normalized_x = direction_x / magnitude;
-                float normalized_y = direction_y / magnitude;
 
-                ballPosition.x += ballSpeed * normalized_x;
-                ballPosition.y += ballSpeed * normalized_y;
+            // Movement
+
+            // Player Direction
+            float rads = PI * playerRotation / 180;
+            float normalized_x = 1 * cosf(rads);
+            float normalized_y = 1 * sinf(rads);
+
+            // Update Position
+            Player.position.x += (Player.speed) * normalized_x;
+            Player.position.y += (Player.speed) * normalized_y;
+
+
+
+
+            // Gear Control
+            if (isGearShifting) {
+                if (gearDirectionUp AND isGearReady AND gear < 5) {
+                    gear++;
+                    isGearReady = !isGearReady;
+                    gearCooldown = gearFullCooldown;
+                }
+                else if (!gearDirectionUp AND isGearReady AND gear > -1) {
+                    gear--;
+                    isGearReady = !isGearReady;
+                    gearCooldown = gearFullCooldown;
+                }
+                isGearShifting = false;
+            }
+
+            if (!isGearReady AND gearCooldown > 0) {
+                gearCooldown -= 1 * dt;
+                if (gearCooldown == 0) {
+                    printf("Gear ready to shift.\n");
+                    isGearReady = !isGearReady;
+                }
             }
         }
         else framesCounter++;
@@ -95,10 +175,29 @@ int main(void) {
         BeginDrawing();
             ClearBackground(RAYWHITE);
 
-            DrawCircleV(ballPosition, (float)(ballRadius), MAROON);
-            DrawText("Press SPACE to PAUSE!", 10, GetScreenHeight() -25, 20, LIGHTGRAY);
+            //Draw(ballPosition, (float)(ballRadius), MAROON);
+            //DrawRectangleV(Player.position, playerSize, MAROON);
+            Rectangle playerRect = {
+                .x = Player.position.x,
+                .y = Player.position.y,
+                .width = playerSize.y,
+                .height = playerSize.x,
+            };
+            Vector2 playerOrigin = {
+                .x = playerSize.y / 2,
+                .y = playerSize.x / 2,
+            };
+            DrawRectanglePro(playerRect, playerOrigin, playerRotation, MAROON);
 
-            if (pause && ((framesCounter/30)%2)) DrawText("PAUSED", ballPosition.x - 50, ballPosition.y - 50, 30, GRAY);
+            char gearDisplay[50];
+            char speedDisplay[50];
+            snprintf(gearDisplay, sizeof(gearDisplay), "Gear: %d", gear);
+            snprintf(speedDisplay, sizeof(speedDisplay), "Speed: %f", Player.speed);
+
+            DrawText(gearDisplay, GetScreenWidth() - 200, GetScreenHeight() - 100, 20, LIGHTGRAY);
+            DrawText(speedDisplay, GetScreenWidth() - 200, GetScreenHeight() - 80, 20, LIGHTGRAY);
+
+            if (pause AND ((framesCounter/30)%2)) DrawText("PAUSED", SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 , 30, GRAY);
             DrawFPS(10,10);
         EndDrawing();
     }
