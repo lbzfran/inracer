@@ -12,7 +12,7 @@ LDFLAGS=-L$(LIB_DIR) -I$(SRC_DIR) -I$(INC_DIR) -lraylib -lm
 FLAGS=$(CFLAGS) $(LDFLAGS)
 
 install:
-	$(CC) -o $(TARGET) $(SRC_DIR)/*.c $(FLAGS)
+	$(CC) -o $(BUILD_DIR)/$(TARGET) $(SRC_DIR)/*.c $(FLAGS)
 
 clean:
 	rm -f $(TARGET)
