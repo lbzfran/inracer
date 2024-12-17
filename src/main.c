@@ -136,12 +136,8 @@ int main(void) {
             /*    };*/
             /*}*/
 
-            if (isMoving AND isAccelerating AND playerGear != 0) {
+            if (isMoving AND isAccelerating AND playerGear != 0 AND Player.speed < playerMaxSpeed * playerGear) {
                 Player.speed += 1.0 * dt;
-                if (Player.speed >= playerMaxSpeed * playerGear) {
-                    // NOTE: downshifting sets speed lower instantly.
-                    Player.speed = playerMaxSpeed * playerGear;
-                }
             } else if (isMoving AND playerGear == -1) { // reversing
                 Player.speed -= 1.0 * dt;
                 if (Player.speed <= playerMaxSpeed * playerGear) {
@@ -153,9 +149,9 @@ int main(void) {
                     Player.speed = 0;
                 }
             } else {
-                Player.speed -= (1 + playerFriction) * dt;
                 //printf("%f\n", Player.speed);
-                if (Player.speed < 0) {
+                Player.speed -= (1 + playerFriction) * dt;
+                if (Player.speed <= 0) {
                     Player.speed = 0;
                 }
             }
