@@ -6,7 +6,7 @@
 
 //typedef struct entity Entity;
 
-struct movement {
+struct movement { // in relation to a car.
     Vector2 position;
     float speed;
 };
