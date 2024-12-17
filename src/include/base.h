@@ -62,6 +62,17 @@ typedef size_t      usize;
 
 typedef void VoidFunc(void);
 
+int ap_int(int a, int b);
+int ap_float(float a, float b);
+
+# define OVERLOADING
+# ifdef OVERLOADING
+#  define ap(a, b) _Generic((a),    \
+    int     :   ap_int((a), (b)),   \
+    float   :   ap_float((a), (b))  \
+)
+# endif
+
 
 // debug tools
 # define ENABLE_ASSERT
