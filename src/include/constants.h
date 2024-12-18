@@ -6,4 +6,7 @@
 # define SCREEN_HEIGHT 720
 # define TARGET_FPS 60
 
+# define ENTITY_MAX 1000
+# define COMPONENTS_MAX 100
+
 #endif //CONSTANTS_H

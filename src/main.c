@@ -3,20 +3,20 @@
 #include "include/raymath.h"
 #include "include/constants.h"
 #include "include/base.h"
+#include <stdlib.h>
 
 //typedef struct entity Entity;
+typedef struct car { // in relation to a car.
+    Vector2         position;
+    f32             rotation;
+    Vector2         size;
+    Vector2         direction;
 
-struct movement { // in relation to a car.
-    Vector2 position;
-    float speed;
-};
+    f32     speed;
+    f32     maxSpeed;
+    f32     rotationSpeed;
+    f32     friction;
 
-struct movement Player = {
-    .position = { SCREEN_WIDTH / 2.0f, SCREEN_HEIGHT / 2.0f },
-    .speed = 0.0f,
-};
-
-struct movement_car {
     bool isRotating;
     bool isMoving;
     bool isAccelerating;
@@ -24,73 +24,92 @@ struct movement_car {
     bool isBreaking;
 
     // Gear Shift
-    int playerGear;
+    i8 gear;
     bool isGearShifting;
     bool isGearReady;
     bool gearDirectionUp;
-    int gearCooldown;
-    int gearFullCooldown;
-};
+    u16 gearCooldown;
+    u16 gearFullCooldown;
+} E_Car;
 
-bool isRotating = false;
-bool isMoving = false;
-bool isAccelerating = false;
-bool isReversing = false;
-bool isBreaking = false;
+E_Car* car_create(f32 pos_start_x, f32 pos_start_y) {
+    E_Car *temp = malloc(sizeof(E_Car));
 
-// Gear Shift
-int playerGear = 0;
-bool isGearShifting = false;
-bool isGearReady = true;
-bool gearDirectionUp = false;
-int gearCooldown = 0;
-int gearFullCooldown = 30;
+    temp->position.x = pos_start_x;
+    temp->position.y = pos_start_y;
+    temp->speed = 0.0f;
 
-int direction_x = 0, direction_y = 0;
+    temp->gear = 0;
+    temp->gearCooldown = 0;
+    temp->gearFullCooldown = 100;
 
-void input(bool *pause) {
+    temp->size.x = 40.0f;
+    temp->size.y = 80.0f;
+
+    temp->direction.x = 40.0f;
+    temp->direction.y = 80.0f;
+
+    temp->rotation = 0.0f;
+    temp->rotationSpeed = 5.0f;
+    temp->friction = 1.0f;
+    temp->maxSpeed = 2.0f;
+    // states
+    temp->isRotating = false;
+    temp->isMoving = false;
+    temp->isAccelerating = false;
+    temp->isReversing = false;
+    temp->isBreaking = false;
+
+    temp->isGearShifting = false;
+    temp->isGearReady = true;
+    temp->gearDirectionUp = false;
+
+    return temp;
+}
+
+void input(bool *pause, E_Car* Player) {
     // handles all inputs
     if (IsKeyPressed(KEY_SPACE))
         *pause = !(*pause);
 
     if (IsKeyDown(KEY_Q)) {
-        isGearShifting = true;
-        gearDirectionUp = false;
+        Player->isGearShifting = true;
+        Player->gearDirectionUp = false;
     }
     else if (IsKeyDown(KEY_E)) {
-        isGearShifting = true;
-        gearDirectionUp = true;
+        Player->isGearShifting = true;
+        Player->gearDirectionUp = true;
     }
 
     if (IsKeyDown(KEY_D)) {
-        direction_x = 1;
+        Player->direction.x = 1;
     }
     else if (IsKeyDown(KEY_A)) {
-        direction_x = -1;
+        Player->direction.x = -1;
     }
-    else direction_x = 0;
+    else Player->direction.x = 0;
 
 
     if (IsKeyDown(KEY_S)) {
-        isBreaking = true;
-        isAccelerating = false;
+        Player->isBreaking = true;
+        Player->isAccelerating = false;
     }
     else if (IsKeyDown(KEY_W)) {
-        isAccelerating = true;
+        Player->isAccelerating = true;
     }
     else {
-        isAccelerating = false;
+        Player->isAccelerating = false;
     }
 
-    if (direction_x != 0)
-        isRotating = true;
+    if (Player->direction.x != 0)
+        Player->isRotating = true;
     else
-        isRotating = false;
+        Player->isRotating = false;
 
-    if (isAccelerating)
-        isMoving = true;
+    if (Player->isAccelerating)
+        Player->isMoving = true;
     else
-        isMoving = false;
+        Player->isMoving = false;
 };
 
 void update() {
@@ -104,30 +123,25 @@ int main(void) {
     // SETUP
     int framesCounter = 0;
     bool pause = 0;
-
-    float playerRotation = 0.0f;
-    float playerRotationSpeed = 5.0f;
-    float playerFriction = 1.0f;
-    float playerMaxSpeed = 2.0f;
-    Vector2 playerSize = { 40.0f, 80.0f };
+    E_Car* Player = car_create(100.0f, 200.0f);
 
     SetTargetFPS(TARGET_FPS);
     while (!WindowShouldClose()) {
         float dt = GetFrameTime();
 
         // INPUT
-        input(&pause);
+        input(&pause, Player);
 
         // UPDATE
         if (!pause) {
-            playerFriction = 1.0f;
-            if (isRotating AND ((isMoving AND playerGear != 0) OR Player.speed > 0)) {
+            Player->friction = 1.0f;
+            if (Player->isRotating AND ((Player->isMoving AND Player->gear != 0) OR Player->speed > 0)) {
                 // only allow turning while moving
-                playerRotation += direction_x * playerRotationSpeed * 0.5;
-                if (playerRotation >= 360) {
-                    playerRotation = 0;
+                Player->rotation += Player->direction.x * Player->rotationSpeed * 0.5;
+                if (Player->rotation >= 360) {
+                    Player->rotation = 0;
                 };
-                playerFriction = 1.0 / playerGear;
+                Player->friction = 1.0 / Player->gear;
             }
             /*else if (isRotating) {*/
             /*    playerRotation += direction_x * playerRotationSpeed;*/
@@ -136,23 +150,23 @@ int main(void) {
             /*    };*/
             /*}*/
 
-            if (isMoving AND isAccelerating AND playerGear != 0 AND Player.speed < playerMaxSpeed * playerGear) {
-                Player.speed += 1.0 * dt;
-            } else if (isMoving AND playerGear == -1) { // reversing
-                Player.speed -= 1.0 * dt;
-                if (Player.speed <= playerMaxSpeed * playerGear) {
-                    Player.speed = playerMaxSpeed * playerGear;
+            if (Player->isMoving AND Player->isAccelerating AND Player->gear != 0 AND Player->speed < Player->maxSpeed * Player->gear) {
+                Player->speed += 1.0 * dt;
+            } else if (Player->isMoving AND Player->gear == -1) { // reversing
+                Player->speed -= 1.0 * dt;
+                if (Player->speed <= Player->maxSpeed * Player->gear) {
+                    Player->speed = Player->maxSpeed * Player->gear;
                 }
-            } else if (Player.speed > 0 AND isBreaking) {
-                Player.speed -= 4.0 * dt;
-                if (Player.speed < 0) {
-                    Player.speed = 0;
+            } else if (Player->speed > 0 AND Player->isBreaking) {
+                Player->speed -= 4.0 * dt;
+                if (Player->speed < 0) {
+                    Player->speed = 0;
                 }
             } else {
-                //printf("%f\n", Player.speed);
-                Player.speed -= (1 + playerFriction) * dt;
-                if (Player.speed <= 0) {
-                    Player.speed = 0;
+                //printf("%f\n", Player->speed);
+                Player->speed -= (1 + Player->friction) * dt;
+                if (Player->speed <= 0) {
+                    Player->speed = 0;
                 }
             }
             //float magnitude = sqrt(direction_x * direction_x + direction_y * direction_y);
@@ -161,37 +175,38 @@ int main(void) {
             // Movement
 
             // Player Direction
-            float rads = PI * playerRotation / 180;
+            float rads = PI * Player->rotation / 180;
             float normalized_x = 1 * cosf(rads);
             float normalized_y = 1 * sinf(rads);
 
             // Update Position
-            Player.position.x += (Player.speed) * normalized_x;
-            Player.position.y += (Player.speed) * normalized_y;
-
-
+            Player->position.x += (Player->speed) * normalized_x;
+            Player->position.y += (Player->speed) * normalized_y;
 
 
             // Gear Control
-            if (isGearShifting) {
-                if (gearDirectionUp AND isGearReady AND playerGear < 5) {
-                    playerGear++;
-                    isGearReady = !isGearReady;
-                    gearCooldown = gearFullCooldown;
+            if (Player->isGearShifting) {
+                /*printf("gear dir up? %d\n", Player->gearDirectionUp);*/
+                /*printf("gear ready? %d\n", Player->isGearReady);*/
+                /*printf("gear < 5? %d\n", Player->gear);*/
+                if (Player->gearDirectionUp AND Player->isGearReady AND Player->gear < 5) {
+                    Player->gear++;
+                    Player->isGearReady = !Player->isGearReady;
+                    Player->gearCooldown = Player->gearFullCooldown;
                 }
-                else if (!gearDirectionUp AND isGearReady AND playerGear > -1) {
-                    playerGear--;
-                    isGearReady = !isGearReady;
-                    gearCooldown = gearFullCooldown;
+                else if (!Player->gearDirectionUp AND Player->isGearReady AND Player->gear > -1) {
+                    Player->gear--;
+                    Player->isGearReady = !Player->isGearReady;
+                    Player->gearCooldown = Player->gearFullCooldown;
                 }
-                isGearShifting = false;
+                Player->isGearShifting = false;
             }
 
-            if (!isGearReady AND gearCooldown > 0) {
-                gearCooldown -= 1 * dt;
-                if (gearCooldown == 0) {
+            if (!Player->isGearReady AND Player->gearCooldown > 0) {
+                Player->gearCooldown -= 1 * dt;
+                if (Player->gearCooldown == 0) {
                     printf("Gear ready to shift.\n");
-                    isGearReady = !isGearReady;
+                    Player->isGearReady = !Player->isGearReady;
                 }
             }
         }
@@ -204,25 +219,28 @@ int main(void) {
 
             //Draw(ballPosition, (float)(ballRadius), MAROON);
             //DrawRectangleV(Player.position, playerSize, MAROON);
-            Rectangle playerRect = {
-                .x = Player.position.x,
-                .y = Player.position.y,
-                .width = playerSize.y,
-                .height = playerSize.x,
+            Rectangle PlayerRect = {
+                .x = Player->position.x,
+                .y = Player->position.y,
+                .width = Player->size.y,
+                .height = Player->size.x,
             };
-            Vector2 playerOrigin = {
-                .x = playerSize.y / 2,
-                .y = playerSize.x / 2,
+            Vector2 PlayerOrigin = {
+                .x = Player->size.y / 2,
+                .y = Player->size.x / 2,
             };
-            DrawRectanglePro(playerRect, playerOrigin, playerRotation, MAROON);
+            DrawRectanglePro(PlayerRect, PlayerOrigin, Player->rotation, MAROON);
 
             char gearDisplay[50];
             char speedDisplay[50];
-            snprintf(gearDisplay, sizeof(gearDisplay), "Gear: %d", playerGear);
-            snprintf(speedDisplay, sizeof(speedDisplay), "Speed: %f", Player.speed);
+            char posDisplay[50];
+            snprintf(gearDisplay, sizeof(gearDisplay), "Gear: %d", Player->gear);
+            snprintf(speedDisplay, sizeof(speedDisplay), "Speed: %f", Player->speed);
+            snprintf(posDisplay, sizeof(posDisplay), "Position: %f %f", Player->position.x, Player->position.y);
 
             DrawText(gearDisplay, GetScreenWidth() - 200, GetScreenHeight() - 100, 20, LIGHTGRAY);
             DrawText(speedDisplay, GetScreenWidth() - 200, GetScreenHeight() - 80, 20, LIGHTGRAY);
+            DrawText(posDisplay, GetScreenWidth() - 400, GetScreenHeight() - 60, 20, LIGHTGRAY);
 
             if (pause AND ((framesCounter/30)%2)) DrawText("PAUSED", SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 , 30, GRAY);
             DrawFPS(10,10);

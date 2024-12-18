@@ -38,9 +38,9 @@
 
 # define ArrayCount(a) (sizeof(a)/sizeof(*(a)))
 
-# define global static
-# define local static
-# define function static
+# define global     static
+# define local      static
+# define function   static
 
 # define AND &&
 # define OR ||
