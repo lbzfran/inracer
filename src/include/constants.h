@@ -9,4 +9,6 @@
 # define ENTITY_MAX 1000
 # define COMPONENTS_MAX 100
 
+#define GRAVITY 9.8 // m/s^2
+
 #endif //CONSTANTS_H
