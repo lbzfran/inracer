@@ -5,51 +5,20 @@
 #include "include/raymath.h"
 #include "include/constants.h"
 #include "include/base.h"
+#include "include/hotpot.h"
+#include "include/car.h"
+#include <dlfcn.h>
 
 
-
-//typedef struct entity Entity;
-typedef struct car { // in relation to a car.
-    Vector2         position;
-    f32             rotation; // angle
-    Vector2         size;
-    Vector2         direction;
-
-    f32             speed;
-    f32             maxSpeed;
-    f32             rotationRate;
-    f32             friction;
-
-    Vector2         velocity;
-    f32             angularVelocity;
-
-    f32             mass;
-    f32             forceNormal;
-    f32             mu;             // friction coeff
-
-    i8              gear;
-    u8              rpm;
-    // TODO: add back gearRatios;
-
-    f32             slipAngle;
-    f32             slipAngleMax;
-    f32             velocityDirAngle;
-
-    bool            isSteering;
-    bool            isMoving;
-    bool            isAccelerating;
-    bool            isReversing;
-    bool            isBreaking;
-
-    // Gear Shift
-    bool            isGearShifting;
-    bool            isGearReady;
-    bool            gearDirectionUp;
-    u16             gearCooldown;
-    u16             gearFullCooldown;
-} E_Car; // ENTITY_Car
+const char *libhot_file_name = "./build/libhotpot.so";
+void *libhot = NULL;
+hotpot_t hotpot_hi = NULL;
+hotpot_init_t hotpot_init = NULL;
+hotpot_update_t hotpot_update = NULL;
+Pot pot;
 
 E_Car* Player;
+
 
 E_Car* car_create(Vector2 pos_start) {
     E_Car *car = malloc(sizeof(E_Car));
@@ -104,10 +73,11 @@ E_Car* car_create(Vector2 pos_start) {
     return car;
 }
 
-void input(bool *pause) {
+void input() {
     // handles all inputs
     if (IsKeyPressed(KEY_SPACE))
-        *pause = !(*pause);
+        /*pot.pause = !(pot.pause);*/
+        hotpot_update(pot);
 
     if (IsKeyDown(KEY_Q)) {
         Player->isGearShifting = true;
@@ -229,22 +199,62 @@ void update(float dt) {
 }
 
 
+
+
+bool load_libhotpot(void) {
+    // TODO: get hot reloading to work ;(
+
+    if (libhot != NULL) dlclose(libhot);
+
+    libhot = dlopen(libhot_file_name, RTLD_NOW);
+    if (libhot == NULL) {
+        fprintf(stderr, "ERROR: could not load %s: %s", libhot_file_name, dlerror());
+        return false;
+    }
+
+    hotpot_hi = dlsym(libhot, "hotpot_hi");
+    if (hotpot_hi == NULL) {
+        fprintf(stderr, "ERROR: could not find hotpot_hi symbol in %s: %s",
+                libhot_file_name, dlerror());
+        return false;
+    }
+    hotpot_init = dlsym(libhot, "hotpot_init");
+    if (hotpot_init == NULL) {
+        fprintf(stderr, "ERROR: could not find hotpot_init symbol in %s: %s",
+                libhot_file_name, dlerror());
+        return false;
+    }
+    hotpot_update = dlsym(libhot, "hotpot_update");
+    if (hotpot_update == NULL) {
+        fprintf(stderr, "ERROR: could not find hotpot_frame symbol in %s: %s",
+                libhot_file_name, dlerror());
+        return false;
+    }
+
+    return true;
+}
+
+
 int main(void) {
+
+    if (!load_libhotpot()) return 1;
+
+    pot = hotpot_init();
+
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "r55");
 
     // SETUP
 
-    Camera camera = { 0 };
-    camera.position = (Vector3){ 10.0f, 10.0f, 10.0f };
-    camera.target = (Vector3){ 0.0f, 0.0f, 0.0f };
-    camera.up = (Vector3){ 0.0f, 1.0f, 0.0f };
-    camera.fovy = 45.0f;
-    camera.projection = CAMERA_PERSPECTIVE;
-
+    /*Camera camera = { 0 };*/
+    /*camera.position = (Vector3){ 10.0f, 10.0f, 10.0f };*/
+    /*camera.target = (Vector3){ 0.0f, 0.0f, 0.0f };*/
+    /*camera.up = (Vector3){ 0.0f, 1.0f, 0.0f };*/
+    /*camera.fovy = 45.0f;*/
+    /*camera.projection = CAMERA_PERSPECTIVE;*/
 
 
     int framesCounter = 0;
-    bool pause = 0;
+    /*bool pause = 0;*/
     Player = car_create((Vector2){100.0f, 200.0f});
 
 
@@ -253,10 +263,10 @@ int main(void) {
         float dt = GetFrameTime();
 
         // INPUT
-        input(&pause);
+        input();
 
         // UPDATE
-        if (!pause) {
+        if (!pot.pause) {
             update(dt);
         }
         else framesCounter++;
@@ -280,9 +290,6 @@ int main(void) {
             };
             DrawRectanglePro(PlayerRect, PlayerOrigin, Player->rotation, MAROON);
 
-            DrawCube;
-
-
             // Draw TEXT
             char gearDisplay[50];
             char speedDisplay[50];
@@ -296,7 +303,7 @@ int main(void) {
             DrawText(speedDisplay, GetScreenWidth() - 200, GetScreenHeight() - 80, 20, LIGHTGRAY);
             DrawText(posDisplay, GetScreenWidth() - 400, GetScreenHeight() - 60, 20, LIGHTGRAY);
 
-            if (pause AND ((framesCounter/30)%2)) DrawText("PAUSED", SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 , 30, GRAY);
+            if (pot.pause AND ((framesCounter/30)%2)) DrawText("PAUSED", SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 , 30, GRAY);
 
             DrawFPS(10, 10);
         EndDrawing();

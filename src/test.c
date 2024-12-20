@@ -1,6 +1,6 @@
-/**/
-/*#include <stdio.h>*/
-/*#include "include/sds.h"*/
+
+#include <stdio.h>
+#include "include/sds.h"
 
 /*int main(int argc, char** argv) {*/
 /*    sds mystring = sdsnew("Hello World!");*/
